@@ -4,8 +4,8 @@ This Argo CD Docker image comes pre-built with support for encrypted Helm value 
 
 ### Included Tools
 
-* **GnuPG** – For PGP key management
-* **Helm Sops (helm-secrets plugin)** – For decrypting Helm secrets
+- **GnuPG** – For PGP key management
+- **Helm Sops (helm-secrets plugin)** – For decrypting Helm secrets
 
 ---
 
@@ -36,7 +36,9 @@ gpg --armor --export-secret-keys <key-id> > gpg.privkey.asc
 Replace `<key-id>` with your actual GPG key ID. This file (`key.asc`) will be used in the next step.
 
 ---
+
 ## 3. Create the GPG Key Secret
+
 Create a Kubernetes secret containing the exported GPG private key:
 
 ```bash
@@ -90,4 +92,3 @@ configs:
 ```
 
 > This enables Argo CD to recognize and process encrypted Helm value files using schemes like `secrets+gpg-import://`.
-
