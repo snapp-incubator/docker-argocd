@@ -18,8 +18,8 @@ Only the `argocd-repo-server` component requires the custom image. Other Argo CD
 ```yaml
 repoServer:
   image:
-    repository: camptocamp/argocd
-    tag: v3.0.5_c2c.1
+    repository: ghcr.io/snapp-incubator/docker-argocd
+    tag: v3.0.5-c1
     imagePullPolicy: ""
 ```
 
@@ -33,7 +33,7 @@ Before creating the Kubernetes secret, export your GPG private key in ASCII-armo
 gpg --armor --export-secret-keys <key-id> > gpg.privkey.asc
 ```
 
-Replace `<key-id>` with your actual GPG key ID. This file (`key.asc`) will be used in the next step.
+Replace `<key-id>` with your actual GPG key ID. This file (`gpg.privkey.asc`) will be used in the next step.
 
 ---
 
