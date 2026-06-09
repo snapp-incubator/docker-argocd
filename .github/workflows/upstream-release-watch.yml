@@ -1,0 +1,93 @@
+---
+# Watches upstream argoproj/argo-cd for new stable releases and, when our
+# Dockerfile base (ARG ARGOCD_VERSION) falls behind, opens a bump PR so we
+# never miss building a new image. Falls back to a tracking issue if the
+# repo does not allow Actions to create pull requests.
+name: upstream-release-watch
+
+on:
+  schedule:
+    # Daily at 06:17 UTC. Off the hour to avoid GitHub's cron congestion.
+    - cron: "17 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  watch:
+    name: check upstream argo-cd
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open bump PR (or issue) when upstream is ahead
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          UPSTREAM="$(gh api repos/argoproj/argo-cd/releases/latest --jq '.tag_name')"
+          CURRENT="$(sed -n 's/^ARG ARGOCD_VERSION="\(.*\)"/\1/p' Dockerfile)"
+          echo "upstream=${UPSTREAM}  current=${CURRENT}"
+
+          if [ -z "${UPSTREAM}" ] || [ -z "${CURRENT}" ]; then
+            echo "::error::could not determine upstream or current version"; exit 1
+          fi
+          if [ "${UPSTREAM}" = "${CURRENT}" ]; then
+            echo "Already on the latest upstream release."; exit 0
+          fi
+
+          # Only act if upstream is strictly newer (guard against downgrades).
+          NEWER="$(printf '%s\n%s\n' "${CURRENT#v}" "${UPSTREAM#v}" | sort -V | tail -1)"
+          if [ "${NEWER}" != "${UPSTREAM#v}" ]; then
+            echo "Current (${CURRENT}) is >= upstream (${UPSTREAM}); nothing to do."; exit 0
+          fi
+
+          BRANCH="bump/argocd-${UPSTREAM}"
+          TITLE="chore: bump Argo CD to ${UPSTREAM}"
+
+          # Idempotency: skip if a PR or branch for this version already exists.
+          if [ "$(gh pr list --head "${BRANCH}" --state open --json number --jq 'length')" != "0" ]; then
+            echo "A PR for ${UPSTREAM} is already open."; exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+            echo "Branch ${BRANCH} already exists."; exit 0
+          fi
+
+          BODY="$(cat <<EOF
+          Automated by the \`upstream-release-watch\` workflow.
+
+          Upstream [argoproj/argo-cd ${UPSTREAM}](https://github.com/argoproj/argo-cd/releases/tag/${UPSTREAM}) is newer than our base image (\`${CURRENT}\`).
+
+          - [ ] Review the upstream [release notes](https://github.com/argoproj/argo-cd/releases/tag/${UPSTREAM}) for breaking changes
+          - [ ] Merge this PR
+          - [ ] Push a \`${UPSTREAM}-c1\` tag to build & publish the image
+
+          > This PR was opened with \`GITHUB_TOKEN\`; the docker-build CI may not auto-run on it. The image is built when you push the \`-c1\` tag after merge.
+          EOF
+          )"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${BRANCH}"
+          sed -i "s|^ARG ARGOCD_VERSION=.*|ARG ARGOCD_VERSION=\"${UPSTREAM}\"|" Dockerfile
+          git add Dockerfile
+          git commit -m "${TITLE}"
+
+          if git push -u origin "${BRANCH}" \
+             && gh pr create --base main --head "${BRANCH}" --title "${TITLE}" --body "${BODY}"; then
+            echo "Opened bump PR for ${UPSTREAM}."
+            exit 0
+          fi
+
+          # Fallback: the repo may forbid Actions from creating PRs. Notify via an issue.
+          echo "PR creation failed; falling back to a tracking issue."
+          ISSUE_TITLE="Upstream Argo CD ${UPSTREAM} available"
+          if [ "$(gh issue list --search "${ISSUE_TITLE} in:title" --state open --json number --jq 'length')" = "0" ]; then
+            gh issue create --title "${ISSUE_TITLE}" --body "${BODY}" --label upstream-release || true
+          else
+            echo "Tracking issue already open."
+          fi
