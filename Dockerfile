@@ -1,9 +1,15 @@
 ARG ARGOCD_VERSION="v3.0.5"
 FROM quay.io/argoproj/argocd:$ARGOCD_VERSION
+
+LABEL org.opencontainers.image.source="https://github.com/snapp-incubator/docker-argocd" \
+      org.opencontainers.image.description="Argo CD with helm-secrets (SOPS/vals) baked in"
+
 ARG SOPS_VERSION=3.9.0
 ARG KUBECTL_VERSION=1.30.2
 ARG VALS_VERSION=0.37.3
 ARG HELM_SECRETS_VERSION=4.6.5
+# Pin curl instead of pulling "latest" so builds are reproducible.
+ARG CURL_VERSION=8.17.0
 
 # vals or sops
 ENV HELM_SECRETS_BACKEND=sops \
@@ -29,9 +35,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /gitops-tools/helm-plugins
 
-RUN \ 
+RUN \
     GO_ARCH=$(uname -m | sed -e 's/x86_64/amd64/') && \
-    wget -qO "/gitops-tools/curl" "https://github.com/moparisthebest/static-curl/releases/latest/download/curl-${GO_ARCH}" && \
+    wget -qO "/gitops-tools/curl" "https://github.com/moparisthebest/static-curl/releases/download/v${CURL_VERSION}/curl-${GO_ARCH}" && \
     true
 
 RUN \
