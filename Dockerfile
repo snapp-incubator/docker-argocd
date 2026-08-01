@@ -1,4 +1,4 @@
-ARG ARGOCD_VERSION="v3.4.5"
+ARG ARGOCD_VERSION="v3.4.6"
 FROM quay.io/argoproj/argocd:$ARGOCD_VERSION
 
 LABEL org.opencontainers.image.source="https://github.com/snapp-incubator/docker-argocd" \
