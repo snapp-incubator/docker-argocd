@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.source="https://github.com/snapp-incubator/docker
 ARG SOPS_VERSION=3.9.0
 ARG KUBECTL_VERSION=1.30.2
 ARG VALS_VERSION=0.37.3
-ARG HELM_SECRETS_VERSION=4.6.5
+ARG HELM_SECRETS_VERSION=4.7.7
 # Pin curl instead of pulling "latest" so builds are reproducible.
 ARG CURL_VERSION=8.17.0
 
@@ -57,11 +57,24 @@ RUN \
     wget -qO- "https://github.com/helmfile/vals/releases/download/v${VALS_VERSION}/vals_${VALS_VERSION}_linux_${GO_ARCH}.tar.gz" | tar zxv -C /gitops-tools vals && \
     true
 
-# helm secert installation 
+# helm-secrets installation.
+#
+# Helm 4 (shipped with Argo CD 3.5) redesigned the plugin system and no longer
+# loads the single legacy `helm-secrets.tar.gz` bundle: it registers as
+# `getter/v1` with apiVersion `legacy`, `helm secrets` is not registered as a
+# command at all, and the wrapper below dies with
+#   Error: unknown command "secrets" for "helm"
+# on every render of a chart that uses a secrets:// value file.
+# The plugin is now published as three separate archives that each carry a v1
+# manifest, and all three have to be unpacked into HELM_PLUGINS.
+# See https://github.com/jkroepke/helm-secrets/issues/859 and the upstream
+# "ArgoCD Integration" wiki page, which this block follows.
 RUN \
-    wget -qO- "https://github.com/jkroepke/helm-secrets/releases/download/v${HELM_SECRETS_VERSION}/helm-secrets.tar.gz" | tar -C /gitops-tools/helm-plugins -xzf- && \
+    wget -qO- "https://github.com/jkroepke/helm-secrets/releases/download/v${HELM_SECRETS_VERSION}/secrets-${HELM_SECRETS_VERSION}.tgz" | tar -C /gitops-tools/helm-plugins -xzf- && \
+    wget -qO- "https://github.com/jkroepke/helm-secrets/releases/download/v${HELM_SECRETS_VERSION}/secrets-getter-${HELM_SECRETS_VERSION}.tgz" | tar -C /gitops-tools/helm-plugins -xzf- && \
+    wget -qO- "https://github.com/jkroepke/helm-secrets/releases/download/v${HELM_SECRETS_VERSION}/secrets-post-renderer-${HELM_SECRETS_VERSION}.tgz" | tar -C /gitops-tools/helm-plugins -xzf- && \
     true
 
-RUN chmod +x /gitops-tools/* && ln -sf /gitops-tools/helm-plugins/helm-secrets/scripts/wrapper/helm.sh /usr/local/sbin/helm
+RUN chmod +x /gitops-tools/* && ln -sf /gitops-tools/helm-plugins/secrets/scripts/wrapper/helm.sh /usr/local/sbin/helm
 
 USER 999
