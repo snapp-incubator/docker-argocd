@@ -11,7 +11,7 @@ This Argo CD Docker image comes pre-built with support for encrypted Helm value 
 
 ## 1. Use the Pre-Built Custom Image
 
-Only the `argocd-repo-server` component requires the custom image. Other Argo CD components can continue using upstream images.
+Only the `argocd-repo-server` component requires the custom image for helm-secrets. Other Argo CD components can continue using upstream images, unless you want the [patches](#patches) below: a patch that touches the UI needs `argocd-server` on this image too.
 
 ### Example Helm Configuration
 
@@ -92,3 +92,17 @@ configs:
 ```
 
 > This enables Argo CD to recognize and process encrypted Helm value files using schemes like `secrets+gpg-import://`.
+
+---
+
+## Patches
+
+`patches/*.patch` are upstream Argo CD commits we carry before they ship in a release. The build clones `argoproj/argo-cd` at `ARGOCD_VERSION`, applies them with `git am`, rebuilds the `argocd` binary (UI included), and swaps it into the upstream image. Drop a patch once `ARGOCD_VERSION` contains it; a patch that stops applying fails the build.
+
+| Patch | Upstream | Affects |
+|---|---|---|
+| `0001-ui-sync-description.patch` | [argoproj/argo-cd#29983](https://github.com/argoproj/argo-cd/pull/29983), ported to the 3.5 sync panel | `argocd-server` (UI) |
+
+## Releases
+
+Tag `vX.Y.Z-cN` to publish `ghcr.io/snapp-incubator/docker-argocd:X.Y.Z-cN`. The tag picks the upstream base `vX.Y.Z`, overriding the Dockerfile default, so an older Argo CD can still get a custom build.
