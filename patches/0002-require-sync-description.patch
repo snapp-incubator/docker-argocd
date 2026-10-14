@@ -1,0 +1,110 @@
+From 57a22c5be7276b89bd7e103465998e74d1bd8432 Mon Sep 17 00:00:00 2001
+From: Raha Alizade <raha.alizade@Snapp-Box.com>
+Date: Wed, 14 Oct 2026 19:08:28 +0330
+Subject: [PATCH] feat: require sync description, scoped by AppProject
+
+Make the sync description mandatory server-side for human-initiated syncs
+whose AppProject is listed in ARGOCD_SYNC_DESCRIPTION_REQUIRED_PROJECTS
+(comma-separated; a trailing "*" matches a project-name prefix, e.g.
+"prod,stg*"). Empty env var disables enforcement, so staging projects
+stay optional while prod requires it. Automated/controller syncs and
+dry-runs are exempt. The UI field is labelled "required for prod" but
+left non-blocking; the server is the single source of truth.
+
+Signed-off-by: Raha Alizade <raha.alizade@Snapp-Box.com>
+---
+ server/application/application.go             | 50 +++++++++++++++++++
+ .../application-sync-panel.tsx                |  2 +-
+ 2 files changed, 51 insertions(+), 1 deletion(-)
+
+diff --git a/server/application/application.go b/server/application/application.go
+index 4480510..94e70cf 100644
+--- a/server/application/application.go
++++ b/server/application/application.go
+@@ -7,6 +7,7 @@ import (
+ 	"fmt"
+ 	"maps"
+ 	"math"
++	"os"
+ 	"reflect"
+ 	"slices"
+ 	"sort"
+@@ -2080,6 +2081,34 @@ func isTheSelectedOne(currentNode *v1alpha1.ResourceNode, q *application.Applica
+ 	return false
+ }
+ 
++// syncDescriptionRequiredForProject reports whether apps in the given
++// AppProject must provide a sync description. The set of required projects is
++// read from ARGOCD_SYNC_DESCRIPTION_REQUIRED_PROJECTS (comma-separated; a
++// trailing "*" matches a project-name prefix). Empty env var means no project
++// requires a description.
++func syncDescriptionRequiredForProject(project string) bool {
++	spec := os.Getenv("ARGOCD_SYNC_DESCRIPTION_REQUIRED_PROJECTS")
++	if strings.TrimSpace(spec) == "" {
++		return false
++	}
++	for _, entry := range strings.Split(spec, ",") {
++		entry = strings.TrimSpace(entry)
++		if entry == "" {
++			continue
++		}
++		if strings.HasSuffix(entry, "*") {
++			if strings.HasPrefix(project, strings.TrimSuffix(entry, "*")) {
++				return true
++			}
++			continue
++		}
++		if project == entry {
++			return true
++		}
++	}
++	return false
++}
++
+ // Sync syncs an application to its target state
+ func (s *Server) Sync(ctx context.Context, syncReq *application.ApplicationSyncRequest) (*v1alpha1.Application, error) {
+ 	a, proj, err := s.getApplicationEnforceRBACClient(ctx, rbac.ActionGet, syncReq.GetProject(), syncReq.GetAppNamespace(), syncReq.GetName(), "")
+@@ -2101,6 +2130,27 @@ func (s *Server) Sync(ctx context.Context, syncReq *application.ApplicationSyncR
+ 		return nil, err
+ 	}
+ 
++	// Require a human-initiated sync to carry a non-empty "message" info, but
++	// only for apps whose AppProject is marked as requiring it. The set of
++	// required projects is configured via the
++	// ARGOCD_SYNC_DESCRIPTION_REQUIRED_PROJECTS env var: a comma-separated list
++	// of project names, where a trailing "*" matches a prefix (e.g. "prod,stg*"
++	// requires the description for the "prod" project and every "stg-..." project).
++	// When the env var is empty, no project requires a description. Automated /
++	// controller syncs (empty username) and dry-runs are always exempt.
++	if username := session.Username(ctx); username != "" && !syncReq.GetDryRun() && syncDescriptionRequiredForProject(a.Spec.Project) {
++		hasMessage := false
++		for _, info := range syncReq.Infos {
++			if info.Name == "message" && strings.TrimSpace(info.Value) != "" {
++				hasMessage = true
++				break
++			}
++		}
++		if !hasMessage {
++			return nil, status.Errorf(codes.InvalidArgument, "sync requires a non-empty 'message' info describing the change (project %q)", a.Spec.Project)
++		}
++	}
++
+ 	if syncReq.Manifests != nil {
+ 		if err := s.enf.EnforceErr(ctx.Value("claims"), rbac.ResourceApplications, rbac.ActionOverride, a.RBACName(s.ns)); err != nil {
+ 			return nil, err
+diff --git a/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx b/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
+index 188cde7..04610e3 100644
+--- a/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
++++ b/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
+@@ -258,7 +258,7 @@ export const ApplicationSyncPanel = ({application, selectedResource, hide}: {app
+                                     </div>
+ 
+                                     <div className='argo-form-row'>
+-                                        <FormField formApi={formApi} label='Sync description (optional)' field='message' component={Text} />
++                                        <FormField formApi={formApi} label='Sync description (required for prod)' field='message' component={Text} />
+                                     </div>
+ 
+                                     <div className='argo-form-row'>
+-- 
+2.43.0
+
