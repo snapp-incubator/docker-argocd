@@ -1,0 +1,76 @@
+From 41fba97247d4383f4cbfccc1e909a667689724fd Mon Sep 17 00:00:00 2001
+From: Raha Alizade <53145698+rahaalizade@users.noreply.github.com>
+Date: Wed, 7 Oct 2026 18:50:14 +0330
+Subject: [PATCH] feat(ui): add optional sync description field stored in
+ operation info (#29983)
+
+Signed-off-by: Raha Alizade <raha.alizade@Snapp-Box.com>
+Co-authored-by: Raha Alizade <raha.alizade@Snapp-Box.com>
+Co-authored-by: Claude Code <noreply@anthropic.com>
+---
+ .../application-sync-panel/application-sync-panel.tsx  | 10 ++++++++--
+ ui/src/app/shared/services/applications-service.ts     |  6 ++++--
+ 2 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx b/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
+index 0f6d9475d..188cde7f1 100644
+--- a/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
++++ b/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
+@@ -58,7 +58,8 @@ export const ApplicationSyncPanel = ({application, selectedResource, hide}: {app
+                             defaultValues={{
+                                 revision: new URLSearchParams(ctx.history.location.search).get('revision') || source.targetRevision || 'HEAD',
+                                 resources: appResources.map((_, i) => i === syncResIndex || syncResIndex === -1),
+-                                syncOptions: application.spec.syncPolicy ? application.spec.syncPolicy.syncOptions : []
++                                syncOptions: application.spec.syncPolicy ? application.spec.syncPolicy.syncOptions : [],
++                                message: ''
+                             }}
+                             validateError={values => ({
+                                 resources: values.resources.every((item: boolean) => !item) && 'Select at least one resource'
+@@ -233,7 +234,8 @@ export const ApplicationSyncPanel = ({application, selectedResource, hide}: {app
+                                         syncStrategy,
+                                         selectedResources,
+                                         params.syncOptions,
+-                                        params.retryStrategy
++                                        params.retryStrategy,
++                                        params.message
+                                     );
+                                     hide();
+                                 } catch (e) {
+@@ -255,6 +257,10 @@ export const ApplicationSyncPanel = ({application, selectedResource, hide}: {app
+                                         <FormField formApi={formApi} label='Revision' field='revision' component={Text} />
+                                     </div>
+ 
++                                    <div className='argo-form-row'>
++                                        <FormField formApi={formApi} label='Sync description (optional)' field='message' component={Text} />
++                                    </div>
++
+                                     <div className='argo-form-row'>
+                                         <div style={{marginBottom: '1em'}}>
+                                             <FormField formApi={formApi} field='syncFlags' component={ApplicationManualSyncFlags} />
+diff --git a/ui/src/app/shared/services/applications-service.ts b/ui/src/app/shared/services/applications-service.ts
+index d99d1c827..0ac9f5e0f 100644
+--- a/ui/src/app/shared/services/applications-service.ts
++++ b/ui/src/app/shared/services/applications-service.ts
+@@ -285,7 +285,8 @@ export class ApplicationsService {
+         strategy: models.SyncStrategy,
+         resources: models.SyncOperationResource[],
+         syncOptions?: string[],
+-        retryStrategy?: models.RetryStrategy
++        retryStrategy?: models.RetryStrategy,
++        message?: string
+     ): Promise<boolean> {
+         return requests
+             .post(`/applications/${name}/sync`)
+@@ -297,7 +298,8 @@ export class ApplicationsService {
+                 strategy,
+                 resources,
+                 syncOptions: syncOptions ? {items: syncOptions} : null,
+-                retryStrategy
++                retryStrategy,
++                infos: message ? [{name: 'message', value: message} as models.Info] : []
+             })
+             .then(() => true);
+     }
+-- 
+2.56.0
+

@@ -25,6 +25,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # A release tag vX.Y.Z-cN builds on upstream vX.Y.Z, so a custom build of
+      # an older Argo CD can still be cut after the Dockerfile default moved on.
+      # Branch and PR builds use the Dockerfile's ARG ARGOCD_VERSION.
+      - name: base version
+        id: base
+        run: |
+          if [[ "$GITHUB_REF" =~ ^refs/tags/(v[0-9]+\.[0-9]+\.[0-9]+)-c[0-9]+$ ]]; then
+            echo "args=ARGOCD_VERSION=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          fi
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -39,6 +48,7 @@ jobs:
           file: "Dockerfile"
           context: .
           platforms: linux/amd64
+          build-args: ${{ steps.base.outputs.args }}
           # Build (and validate) on every event, but only publish on
           # pushes/tags — never publish images built from pull requests.
           push: ${{ github.event_name != 'pull_request' }}
