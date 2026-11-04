@@ -1,4 +1,4 @@
-ARG ARGOCD_VERSION="v3.5.7"
+ARG ARGOCD_VERSION="v3.6.1"
 
 # Patched argocd binary.
 #
