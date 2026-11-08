@@ -1,7 +1,7 @@
-From 57a22c5be7276b89bd7e103465998e74d1bd8432 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Raha Alizade <raha.alizade@Snapp-Box.com>
 Date: Wed, 14 Oct 2026 19:08:28 +0330
-Subject: [PATCH] feat: require sync description, scoped by AppProject
+Subject: [PATCH 2/2] feat: require sync description, scoped by AppProject
 
 Make the sync description mandatory server-side for human-initiated syncs
 whose AppProject is listed in ARGOCD_SYNC_DESCRIPTION_REQUIRED_PROJECTS
@@ -12,13 +12,15 @@ dry-runs are exempt. The UI field is labelled "required for prod" but
 left non-blocking; the server is the single source of truth.
 
 Signed-off-by: Raha Alizade <raha.alizade@Snapp-Box.com>
+
+Ported to the 3.6 layout: the sync form moved into application-sync-panel-body.tsx.
 ---
  server/application/application.go             | 50 +++++++++++++++++++
- .../application-sync-panel.tsx                |  2 +-
+ .../application-sync-panel-body.tsx           |  2 +-
  2 files changed, 51 insertions(+), 1 deletion(-)
 
 diff --git a/server/application/application.go b/server/application/application.go
-index 4480510..94e70cf 100644
+index c36db20..b8925ad 100644
 --- a/server/application/application.go
 +++ b/server/application/application.go
 @@ -7,6 +7,7 @@ import (
@@ -29,7 +31,7 @@ index 4480510..94e70cf 100644
  	"reflect"
  	"slices"
  	"sort"
-@@ -2080,6 +2081,34 @@ func isTheSelectedOne(currentNode *v1alpha1.ResourceNode, q *application.Applica
+@@ -2101,6 +2102,34 @@ func isTheSelectedOne(currentNode *v1alpha1.ResourceNode, q *application.Applica
  	return false
  }
  
@@ -64,7 +66,7 @@ index 4480510..94e70cf 100644
  // Sync syncs an application to its target state
  func (s *Server) Sync(ctx context.Context, syncReq *application.ApplicationSyncRequest) (*v1alpha1.Application, error) {
  	a, proj, err := s.getApplicationEnforceRBACClient(ctx, rbac.ActionGet, syncReq.GetProject(), syncReq.GetAppNamespace(), syncReq.GetName(), "")
-@@ -2101,6 +2130,27 @@ func (s *Server) Sync(ctx context.Context, syncReq *application.ApplicationSyncR
+@@ -2122,6 +2151,27 @@ func (s *Server) Sync(ctx context.Context, syncReq *application.ApplicationSyncR
  		return nil, err
  	}
  
@@ -92,19 +94,16 @@ index 4480510..94e70cf 100644
  	if syncReq.Manifests != nil {
  		if err := s.enf.EnforceErr(ctx.Value("claims"), rbac.ResourceApplications, rbac.ActionOverride, a.RBACName(s.ns)); err != nil {
  			return nil, err
-diff --git a/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx b/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
-index 188cde7..04610e3 100644
---- a/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
-+++ b/ui/src/app/applications/components/application-sync-panel/application-sync-panel.tsx
-@@ -258,7 +258,7 @@ export const ApplicationSyncPanel = ({application, selectedResource, hide}: {app
-                                     </div>
+diff --git a/ui/src/app/applications/components/application-sync-panel/application-sync-panel-body.tsx b/ui/src/app/applications/components/application-sync-panel/application-sync-panel-body.tsx
+index 91e63f3..3e3d562 100644
+--- a/ui/src/app/applications/components/application-sync-panel/application-sync-panel-body.tsx
++++ b/ui/src/app/applications/components/application-sync-panel/application-sync-panel-body.tsx
+@@ -245,7 +245,7 @@ export const ApplicationSyncPanelBody = ({
+                             </div>
  
-                                     <div className='argo-form-row'>
--                                        <FormField formApi={formApi} label='Sync description (optional)' field='message' component={Text} />
-+                                        <FormField formApi={formApi} label='Sync description (required for prod)' field='message' component={Text} />
-                                     </div>
+                             <div className='argo-form-row'>
+-                                <FormField formApi={formApi} label='Sync description (optional)' field='message' component={Text} />
++                                <FormField formApi={formApi} label='Sync description (required for prod)' field='message' component={Text} />
+                             </div>
  
-                                     <div className='argo-form-row'>
--- 
-2.43.0
-
+                             <div className='argo-form-row'>
