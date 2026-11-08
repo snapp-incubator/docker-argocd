@@ -8,7 +8,7 @@ ARG ARGOCD_VERSION="v3.6.1"
 # rebuilt, and it replaces /usr/local/bin/argocd in the upstream image below.
 # Stages and toolchain pins follow upstream's own Dockerfile. Drop a patch once
 # ARGOCD_VERSION contains it; a patch that no longer applies fails the build.
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.26.9@sha256:f1f0bcc2c524a3ced375fcb4d1ecb7aa371aa7070e112599aaca45cc02d0101b AS argocd-src
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b AS argocd-src
 ARG ARGOCD_VERSION
 WORKDIR /src
 RUN git clone --quiet --depth 1 --branch "${ARGOCD_VERSION}" https://github.com/argoproj/argo-cd.git .
@@ -18,16 +18,16 @@ RUN for p in /patches/*.patch; do \
       git -c user.name=docker-argocd -c user.email=docker-argocd@localhost am "$p" || exit 1; \
     done
 
-FROM --platform=$BUILDPLATFORM docker.io/library/node:24.14.1@sha256:80fc934952c8f1b2b4d39907af7211f8a9fff1a4c2cf673fb49099292c251cec AS argocd-ui
+FROM --platform=$BUILDPLATFORM docker.io/library/node:24.17.0@sha256:032e78d7e54e352129831743737e3a83171d9cc5b5896f411649c597ce0b11ea AS argocd-ui
 WORKDIR /src
-COPY --from=argocd-src /src/ui/package.json /src/ui/pnpm-lock.yaml ./
+COPY --from=argocd-src /src/ui/package.json /src/ui/pnpm-lock.yaml /src/ui/pnpm-workspace.yam[l] ./
 RUN npm install -g corepack@0.34.6 && corepack enable && pnpm install --frozen-lockfile
 COPY --from=argocd-src /src/ui/ .
 ARG ARGOCD_VERSION
 ENV ARGO_VERSION=$ARGOCD_VERSION
 RUN NODE_ENV='production' NODE_ONLINE_ENV='online' NODE_OPTIONS=--max_old_space_size=8192 pnpm build
 
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.26.9@sha256:f1f0bcc2c524a3ced375fcb4d1ecb7aa371aa7070e112599aaca45cc02d0101b AS argocd-build
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b AS argocd-build
 WORKDIR /go/src/github.com/argoproj/argo-cd
 COPY --from=argocd-src /src/ .
 RUN go mod download
