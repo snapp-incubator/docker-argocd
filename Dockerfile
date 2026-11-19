@@ -8,7 +8,7 @@ ARG ARGOCD_VERSION="v3.6.2"
 # rebuilt, and it replaces /usr/local/bin/argocd in the upstream image below.
 # Stages and toolchain pins follow upstream's own Dockerfile. Drop a patch once
 # ARGOCD_VERSION contains it; a patch that no longer applies fails the build.
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b AS argocd-src
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.4@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c AS argocd-src
 ARG ARGOCD_VERSION
 WORKDIR /src
 RUN git clone --quiet --depth 1 --branch "${ARGOCD_VERSION}" https://github.com/argoproj/argo-cd.git .
@@ -27,7 +27,7 @@ ARG ARGOCD_VERSION
 ENV ARGO_VERSION=$ARGOCD_VERSION
 RUN NODE_ENV='production' NODE_ONLINE_ENV='online' NODE_OPTIONS=--max_old_space_size=8192 pnpm build
 
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b AS argocd-build
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.4@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c AS argocd-build
 WORKDIR /go/src/github.com/argoproj/argo-cd
 COPY --from=argocd-src /src/ .
 RUN go mod download
